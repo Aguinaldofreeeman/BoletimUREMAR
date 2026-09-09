@@ -1,0 +1,6 @@
+{
+  "name": "Gerador de Boletim Semanal",
+  "description": "Sistema de upload de boletins semanais com geração automática de página web com sumário e exportação para redes sociais via API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
