@@ -1,7 +1,7 @@
 import { Bulletin, BulletinItem } from '../types';
 
 export function generateStandaloneHtml(bulletin: Bulletin): string {
-  const initialJson = JSON.stringify(bulletin);
+  const initialJson = JSON.stringify(bulletin).replace(/<\/script/gi, '<\\/script');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" data-theme="light">
@@ -900,19 +900,36 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
             </p>
           </div>
 
-          <div class="dropzone" id="dropzoneEl" onclick="triggerAdminFileInput()" title="Clique para abrir a seleção de arquivos">
-            <input type="file" id="fileInputEl" accept=".pdf,.txt,.md,.json,.doc,.docx,application/pdf" onchange="handleFileSelected(event)" style="display:none;">
-            <div style="pointer-events:none;">
+          <div class="dropzone" id="dropzoneEl" style="position:relative; overflow:hidden;" title="Clique para abrir a seleção de arquivos">
+            <input type="file" id="fileInputEl" accept=".pdf,.txt,.md,.json,.doc,.docx,application/pdf" onchange="handleFileSelected(event)" style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:30;">
+            <div style="pointer-events:none; position:relative; z-index:10;">
               <div style="font-size:2.2rem; margin-bottom:0.5rem;">📄</div>
               <p style="font-weight:700; font-size:0.95rem;">Clique para selecionar ou arraste o arquivo do Boletim aqui (PDF, TXT, JSON)</p>
               <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">Suporta PDF nativo (extração de texto página por página), TXT, Markdown e Backup JSON</p>
               <span id="fileNameLabel" style="display:inline-block; margin-top:0.5rem; font-size:0.8rem; font-weight:600; color:var(--primary-light);"></span>
             </div>
-            <div style="margin-top:0.85rem;">
-              <button type="button" class="btn btn-primary" onclick="event.stopPropagation(); triggerAdminFileInput();" style="font-size:0.85rem; padding:0.55rem 1.25rem; font-weight:700;">
+            <div style="margin-top:0.85rem; pointer-events:none; position:relative; z-index:10;">
+              <span class="btn btn-primary" style="font-size:0.85rem; padding:0.55rem 1.25rem; font-weight:700; display:inline-block;">
                 📂 Escolher Arquivo PDF / TXT
-              </button>
+              </span>
             </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem; padding:0.6rem 0.85rem; background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.2); border-radius:8px; font-size:0.8rem;">
+            <span>Opção direta com o seletor do sistema operacional:</span>
+            <label for="fileInputFallbackEl" class="btn btn-primary" style="padding:0.4rem 0.85rem; font-size:0.8rem; cursor:pointer; margin:0; display:inline-flex; align-items:center; gap:0.35rem;">
+              📁 Selecionar Arquivo do Computador
+              <input type="file" id="fileInputFallbackEl" accept=".pdf,.txt,.md,.json,.doc,.docx,application/pdf" onchange="handleFileSelected(event)" style="position:absolute; width:1px; height:1px; opacity:0; clip:rect(0,0,0,0);">
+            </label>
+          </div>
+
+          <!-- PDF Preview area in downloaded HTML -->
+          <div id="pdfViewerArea" style="display:none; margin-top:1rem; border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+            <div style="background:var(--surface); padding:0.5rem 0.75rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+              <span style="font-size:0.8rem; font-weight:700;" id="pdfViewerTitle">📄 Pré-visualização do PDF</span>
+              <button type="button" onclick="document.getElementById('pdfViewerArea').style.display='none'" style="border:none; background:transparent; cursor:pointer; font-size:0.8rem; color:var(--text-muted);">✕ Fechar</button>
+            </div>
+            <iframe id="pdfPreviewIframe" style="width:100%; height:380px; border:none;"></iframe>
           </div>
 
           <div class="form-group">
@@ -1343,20 +1360,21 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
       const start = text.slice(0, 150);
       if (start.includes('%PDF-')) return true;
       if (text.includes('/Type/Catalog') || (text.includes('endobj') && text.includes('stream'))) return true;
-      const corruptChars = (text.match(/[\uFFFD\x00-\x08\x0E-\x1F]/g) || []).length;
+      const corruptChars = (text.match(/[\\uFFFD\\x00-\\x08\\x0E-\\x1F]/g) || []).length;
       return corruptChars > 8;
     }
 
     function cleanExtractedText(text) {
+      if (!text) return '';
       return text
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\uFFFD]/g, ' ')
-        .replace(/<<\/[^>]+>>/g, '')
-        .replace(/[0-9]+\s+[0-9]+\s+obj/g, '')
+        .replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\uFFFD]/g, ' ')
+        .replace(/<<[\\s\\S]*?>>/g, '')
+        .replace(/[0-9]+\\s+[0-9]+\\s+obj/g, '')
         .replace(/endobj/g, '')
         .replace(/endstream/g, '')
-        .replace(/stream[\s\S]*?endstream/g, '')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/\n\s*\n\s*\n+/g, '\n\n')
+        .replace(/stream[\\s\\S]*?endstream/g, '')
+        .replace(/[ \\t]+/g, ' ')
+        .replace(/\\n\\s*\\n\\s*\\n+/g, '\\n\\n')
         .trim();
     }
 
@@ -1367,11 +1385,11 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
       for (let i = 0; i < len; i++) {
         binary += String.fromCharCode(bytes[i]);
       }
-      const matches = binary.match(/\(([^()]{3,})\)\s*(?:Tj|'|")/g) || [];
+      const matches = binary.match(/\\(([^()]{3,})\\)\\s*(?:Tj|'|")/g) || [];
       const parts = [];
       for (const m of matches) {
-        const clean = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|'|")$/, '').trim();
-        if (clean.length > 2 && !/[^\x20-\x7E\xA0-\xFF]/.test(clean)) {
+        const clean = m.replace(/^\\(/, '').replace(/\\)\\s*(?:Tj|'|")$/, '').trim();
+        if (clean.length > 2 && !/[^\\x20-\\x7E\\xA0-\\xFF]/.test(clean)) {
           parts.push(clean);
         }
       }
@@ -1380,20 +1398,38 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
 
     // File Handling
     function triggerAdminFileInput() {
-      const el = document.getElementById('fileInputEl');
+      const el = document.getElementById('fileInputFallbackEl') || document.getElementById('fileInputEl');
       if (el) el.click();
     }
 
     function handleFileSelected(e) {
-      const file = e.target.files[0];
+      let file = null;
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        file = e.dataTransfer.files[0];
+      } else if (e.target && e.target.files && e.target.files.length > 0) {
+        file = e.target.files[0];
+        try { e.target.value = ''; } catch (_) {}
+      }
       if (!file) return;
-
-      e.target.value = '';
 
       document.getElementById('fileNameLabel').textContent = 'Arquivo selecionado: ' + file.name;
 
       // Check if PDF file
       if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+        try {
+          const objUrl = URL.createObjectURL(file);
+          const previewArea = document.getElementById('pdfViewerArea');
+          const previewIframe = document.getElementById('pdfPreviewIframe');
+          const previewTitle = document.getElementById('pdfViewerTitle');
+          if (previewArea && previewIframe) {
+            previewIframe.src = objUrl;
+            if (previewTitle) previewTitle.textContent = '📄 ' + file.name;
+            previewArea.style.display = 'block';
+          }
+        } catch (previewErr) {
+          console.warn('Preview offline indisponível:', previewErr);
+        }
+
         showToast('⏳ Lendo PDF e extraindo texto das páginas...');
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -1408,12 +1444,13 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
                 const strings = textContent.items.map(it => it.str || '');
-                extracted += strings.join(' ') + '\n\n';
+                extracted += strings.join(' ') + "\\n\\n";
               }
               extracted = cleanExtractedText(extracted);
               if (extracted && extracted.length > 30) {
                 document.getElementById('rawTextInput').value = extracted;
-                showToast('✅ PDF de ' + pdf.numPages + ' páginas lido com sucesso! Clique em "Processar & Estruturar".');
+                showToast('✅ PDF de ' + pdf.numPages + ' páginas lido! Estruturando matérias automaticamente...');
+                setTimeout(processRawText, 350);
                 return;
               }
             }
@@ -1422,12 +1459,14 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
             extracted = cleanExtractedText(extractTextFromBinaryPdfFallback(buffer));
             if (extracted && extracted.length > 20) {
               document.getElementById('rawTextInput').value = extracted;
-              showToast('✅ Texto extraído do PDF! Clique em "Processar & Estruturar".');
+              showToast('✅ Texto extraído do PDF! Estruturando matérias...');
+              setTimeout(processRawText, 350);
               return;
             }
 
-            document.getElementById('rawTextInput').value = 'BOLETIM SEMANAL - ' + file.name + '\n\n' + (extracted || 'Conteúdo do arquivo importado.');
+            document.getElementById('rawTextInput').value = 'BOLETIM SEMANAL - ' + file.name + "\\n\\n" + (extracted || 'Conteúdo do arquivo importado.');
             showToast('Arquivo importado com sucesso! Clique em "Processar & Estruturar".');
+            setTimeout(processRawText, 350);
           } catch (err) {
             console.error(err);
             document.getElementById('rawTextInput').value = 'BOLETIM SEMANAL - ' + file.name;
@@ -1494,7 +1533,7 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
       }
 
       // Split lines
-      const lines = targetText.split('\n').map(l => l.trim()).filter(Boolean);
+      const lines = targetText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const parsedItems = [];
       let current = null;
       let counter = 1;
@@ -1505,14 +1544,14 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
         // Reject PDF internal tokens and binary stream artifacts
         if (
           line.startsWith('%PDF-') ||
-          /^[0-9]+\s+[0-9]+\s+obj/.test(line) ||
+          /^[0-9]+\\s+[0-9]+\\s+obj/.test(line) ||
           line === 'endobj' ||
           line === 'stream' ||
           line === 'endstream' ||
           line.startsWith('<<') ||
           line.endsWith('>>') ||
           /xref|trailer|startxref/.test(line) ||
-          (line.match(/[\uFFFD\x00-\x08\x0E-\x1F]/g) || []).length > 2
+          (line.match(/[\\uFFFD\\x00-\\x08\\x0E-\\x1F]/g) || []).length > 2
         ) {
           continue;
         }
@@ -1558,7 +1597,7 @@ export function generateStandaloneHtml(bulletin: Bulletin): string {
           } else if (line.startsWith('•') || line.startsWith('-') || line.toLowerCase().includes('atenção:') || line.toLowerCase().includes('importante:')) {
             current.importantNotes.push(line.replace(/^[•\\-]\\s*/, ''));
           } else {
-            current.content = (current.content ? current.content + '\\n' : '') + line;
+            current.content = (current.content ? current.content + "\n" : '') + line;
           }
         }
       }

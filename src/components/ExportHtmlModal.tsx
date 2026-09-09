@@ -30,6 +30,10 @@ export const ExportHtmlModal: React.FC<ExportHtmlModalProps> = ({ bulletin, onDo
   };
 
   const handleOpenInNewTab = () => {
+    if (bulletin.id) {
+      window.open(`/api/bulletins/${bulletin.id}/html`, '_blank');
+      return;
+    }
     const blob = new Blob([htmlCode], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');

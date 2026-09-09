@@ -107,17 +107,23 @@ export const AdminUploadView: React.FC<AdminUploadViewProps> = ({
   const [editingItem, setEditingItem] = useState<BulletinItem | null>(null);
   const [isNewItemModal, setIsNewItemModal] = useState(false);
 
-  // Drag and drop handler
+  // Drag and drop or file selection handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
     let file: File | null = null;
-    if ('dataTransfer' in e) {
+    if ('dataTransfer' in e && e.dataTransfer) {
       e.preventDefault();
+      e.stopPropagation();
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         file = e.dataTransfer.files[0];
       }
-    } else if (e.target.files && e.target.files.length > 0) {
-      file = e.target.files[0];
-      e.target.value = '';
+    } else if ('target' in e && e.target) {
+      const targetInput = e.target as HTMLInputElement;
+      if (targetInput.files && targetInput.files.length > 0) {
+        file = targetInput.files[0];
+      }
+      try {
+        targetInput.value = '';
+      } catch (_) {}
     }
 
     if (!file) return;
@@ -425,33 +431,34 @@ export const AdminUploadView: React.FC<AdminUploadViewProps> = ({
 
           {/* Drag & Drop Area */}
           <div
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onDrop={handleFileUpload}
-            onClick={isProcessing ? undefined : () => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all relative ${
+            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all relative overflow-hidden ${
               isProcessing
                 ? 'border-blue-500 bg-blue-50/70 cursor-wait'
                 : 'border-blue-300 hover:border-blue-600 bg-blue-50/30 hover:bg-blue-50/60 transition-all cursor-pointer relative group'
             }`}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (!isProcessing && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault();
-                fileInputRef.current?.click();
-              }
-            }}
             title={isProcessing ? 'Processamento em andamento...' : 'Clique para abrir a janela de seleção de arquivo PDF'}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              id="fileInput"
-              disabled={isProcessing}
-              onChange={handleFileUpload}
-              className="hidden"
-              accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx,text/*"
-            />
+            {/* Native file input covering the entire dropzone card */}
+            {!isProcessing && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="fileInputAdmin"
+                onChange={handleFileUpload}
+                accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+                title="Clique aqui para escolher o arquivo PDF no seu computador"
+              />
+            )}
 
             {isProcessing ? (
               /* Loading Spinner and Progress Bar View */
@@ -516,8 +523,8 @@ export const AdminUploadView: React.FC<AdminUploadViewProps> = ({
               </div>
             ) : (
               /* Idle Upload View */
-              <>
-                <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+              <div className="pointer-events-none relative z-10">
+                <div className="flex flex-col items-center justify-center space-y-2">
                   <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
                     <UploadCloud className="w-7 h-7" />
                   </div>
@@ -533,21 +540,40 @@ export const AdminUploadView: React.FC<AdminUploadViewProps> = ({
                 </div>
 
                 <div className="mt-4 flex justify-center">
-                  <button
-                    type="button"
+                  <span
                     id="btn-choose-file-admin"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      fileInputRef.current?.click();
-                    }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow hover:shadow-md transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 group-hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow group-hover:shadow-md transition-all cursor-pointer"
                   >
                     <UploadCloud className="w-4 h-4" />
                     <span>Escolher Arquivo PDF / Documento</span>
-                  </button>
+                  </span>
                 </div>
-              </>
+              </div>
             )}
+          </div>
+
+          {/* Direct File Selector Fallback */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-slate-700">
+            <div className="flex items-center gap-2">
+              <UploadCloud className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Opção direta para abrir o seletor de arquivos do sistema:</span>
+            </div>
+            <label
+              htmlFor="fileInputDirect"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer shadow hover:shadow-md transition-all shrink-0"
+              title="Clique para selecionar o arquivo PDF no seu computador"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Selecionar Arquivo PDF</span>
+              <input
+                type="file"
+                id="fileInputDirect"
+                disabled={isProcessing}
+                onChange={handleFileUpload}
+                accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
+                className="sr-only"
+              />
+            </label>
           </div>
 
           {/* Direct Text Paste Area */}

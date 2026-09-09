@@ -15,6 +15,11 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
   const [uploadedPdfName, setUploadedPdfName] = useState<string | null>(null);
+  const [downloadToast, setDownloadToast] = useState<{
+    fileName: string;
+    serverUrl: string;
+    blobUrl?: string;
+  } | null>(null);
 
   // Sync with Express backend on mount
   useEffect(() => {
@@ -119,22 +124,49 @@ export default function App() {
     }
   };
 
-  // Download standalone HTML file
-  const handleDownloadHtml = () => {
-    const html = generateStandaloneHtml(currentBulletin);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `boletim-${currentBulletin.edition.replace(/[^a-zA-Z0-9_-]/g, '_')}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Download standalone HTML file with multi-layer fallback
+  const handleDownloadHtml = async () => {
+    try {
+      const html = generateStandaloneHtml(currentBulletin);
+      const safeEdition = currentBulletin.edition.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `boletim-${safeEdition}.html`;
+      const serverUrl = `/api/bulletins/${currentBulletin.id}/html?download=true`;
+
+      // 1. Sync state to server in background
+      fetch('/api/bulletins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentBulletin),
+      }).catch(() => {});
+
+      // 2. Client Blob download
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Keep blob URL active for 60 seconds (never revoke immediately!)
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (_) {}
+      }, 60000);
+
+      // 3. Set persistent toast with direct click option
+      setDownloadToast({ fileName, serverUrl, blobUrl });
+    } catch (err) {
+      console.error('Erro ao baixar HTML:', err);
+      window.open(`/api/bulletins/${currentBulletin.id}/html?download=true`, '_blank');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -152,6 +184,7 @@ export default function App() {
             onEditInAdmin={() => setActiveTab('admin')}
             onOpenSocial={() => setActiveTab('social')}
             onUploadFile={handleDirectFileUpload}
+            onDownloadHtml={handleDownloadHtml}
           />
         )}
 
@@ -177,6 +210,55 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Floating Download Feedback Toast */}
+      {downloadToast && (
+        <div
+          id="toast-download-feedback"
+          className="fixed bottom-5 right-5 left-5 sm:left-auto max-w-md bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-slate-700 z-50 flex flex-col gap-2 transition-all animate-fade-in"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400 text-lg">✅</span>
+              <div>
+                <p className="text-sm font-bold">Arquivo HTML Pronto!</p>
+                <p className="text-xs text-slate-300">
+                  {downloadToast.fileName}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDownloadToast(null)}
+              className="text-slate-400 hover:text-white text-sm px-1 cursor-pointer"
+              title="Fechar"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">
+            O download foi acionado. Se o navegador não salvou automaticamente, use as opções abaixo:
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <a
+              href={downloadToast.serverUrl}
+              download={downloadToast.fileName}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              ⬇️ Baixar Direto (Servidor)
+            </a>
+            <a
+              href={`/api/bulletins/${currentBulletin.id}/html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-600"
+            >
+              🌐 Abrir em Nova Aba
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -17,7 +17,8 @@ import {
   CheckCircle,
   Tag,
   Settings,
-  UploadCloud
+  UploadCloud,
+  Download
 } from 'lucide-react';
 
 interface PublicWebsiteViewProps {
@@ -25,6 +26,7 @@ interface PublicWebsiteViewProps {
   onEditInAdmin: (item?: BulletinItem) => void;
   onOpenSocial: () => void;
   onUploadFile?: (file: File) => void;
+  onDownloadHtml?: () => void;
 }
 
 export const PublicWebsiteView: React.FC<PublicWebsiteViewProps> = ({
@@ -32,6 +34,7 @@ export const PublicWebsiteView: React.FC<PublicWebsiteViewProps> = ({
   onEditInAdmin,
   onOpenSocial,
   onUploadFile,
+  onDownloadHtml,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -127,30 +130,31 @@ export const PublicWebsiteView: React.FC<PublicWebsiteViewProps> = ({
 
             {/* Quick Action Tools */}
             <div className="flex flex-wrap md:flex-col gap-2 shrink-0 self-start md:self-center">
-              {/* Hidden file input for direct PDF upload */}
-              <input
-                ref={heroFileInputRef}
-                type="file"
-                id="heroFileInput"
-                className="hidden"
-                accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    onUploadFile?.(e.target.files[0]);
-                    e.target.value = '';
-                  }
-                }}
-              />
-
-              <button
+              {/* Native file upload label for Hero */}
+              <label
+                htmlFor="heroFileInput"
                 id="btn-quick-upload-pdf"
-                onClick={() => heroFileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition-all shadow cursor-pointer"
                 title="Abrir janela para selecionar e enviar PDF do boletim semanal"
               >
                 <UploadCloud className="w-4 h-4" />
                 <span>Subir Arquivo PDF</span>
-              </button>
+                <input
+                  ref={heroFileInputRef}
+                  type="file"
+                  id="heroFileInput"
+                  className="sr-only"
+                  accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      onUploadFile?.(e.target.files[0]);
+                      try {
+                        e.target.value = '';
+                      } catch (_) {}
+                    }
+                  }}
+                />
+              </label>
 
               <button
                 id="btn-admin-upload"
@@ -188,6 +192,18 @@ export const PublicWebsiteView: React.FC<PublicWebsiteViewProps> = ({
                 <Sparkles className="w-4 h-4" />
                 <span>Exportar Redes</span>
               </button>
+
+              {onDownloadHtml && (
+                <button
+                  id="btn-quick-download-html"
+                  onClick={onDownloadHtml}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition-all shadow cursor-pointer"
+                  title="Baixar arquivo HTML único e independente da página web"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Página Web</span>
+                </button>
+              )}
             </div>
 
           </div>

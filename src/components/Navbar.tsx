@@ -119,30 +119,31 @@ export const Navbar: React.FC<NavbarProps> = ({
               </select>
             )}
 
-            {/* Hidden file input for direct header upload */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              id="headerFileInput"
-              className="hidden"
-              accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
-              onChange={(e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                  onUploadFile?.(e.target.files[0]);
-                  e.target.value = '';
-                }
-              }}
-            />
-
-            <button
+            {/* Native file upload label for header */}
+            <label
+              htmlFor="headerFileInput"
               id="btn-upload-pdf-top"
-              onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold rounded-lg shadow transition-colors cursor-pointer"
               title="Selecionar e enviar arquivo PDF do boletim"
             >
               <UploadCloud className="w-3.5 h-3.5" />
               <span className="font-semibold">Subir PDF</span>
-            </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="headerFileInput"
+                className="sr-only"
+                accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    onUploadFile?.(e.target.files[0]);
+                    try {
+                      e.target.value = '';
+                    } catch (_) {}
+                  }
+                }}
+              />
+            </label>
 
             <button
               id="btn-download-html-top"
@@ -171,12 +172,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Admin (Upload)
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-2 py-1 rounded text-emerald-400 font-semibold flex items-center gap-1"
+          <label
+            htmlFor="headerFileInputMobile"
+            className="px-2 py-1 rounded text-emerald-400 font-semibold flex items-center gap-1 cursor-pointer"
           >
             <UploadCloud className="w-3 h-3" /> Subir PDF
-          </button>
+            <input
+              type="file"
+              id="headerFileInputMobile"
+              className="sr-only"
+              accept=".pdf,application/pdf,.txt,.md,.json,.doc,.docx"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  onUploadFile?.(e.target.files[0]);
+                  try {
+                    e.target.value = '';
+                  } catch (_) {}
+                }
+              }}
+            />
+          </label>
           <button
             onClick={() => setActiveTab('social')}
             className={`px-2 py-1 rounded ${activeTab === 'social' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}

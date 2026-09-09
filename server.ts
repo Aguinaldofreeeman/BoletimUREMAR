@@ -126,6 +126,20 @@ app.get("/api/bulletins/:id/html", (req, res) => {
   res.send(html);
 });
 
+// Direct download HTML endpoint via POST
+app.post("/api/bulletins/download-html", (req, res) => {
+  try {
+    const { bulletin, html, fileName } = req.body;
+    const finalHtml = html || (bulletin ? generateStandaloneHtml(bulletin) : "");
+    const safeName = (fileName || `boletim-${bulletin?.edition || "atual"}.html`).replace(/[^a-zA-Z0-9_.-]/g, "_");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(finalHtml);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Erro ao gerar download" });
+  }
+});
+
 // Helper functions for PDF and Bulletin processing
 function cleanExtractedText(text: string): string {
   if (!text) return "";
